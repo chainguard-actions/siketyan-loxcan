@@ -1,0 +1,32 @@
+services:
+  guzzle.client.github:
+    class: GuzzleHttp\Client
+    arguments:
+      - 'base_uri': 'https://api.github.com/'
+
+  Siketyan\Loxcan\Reporter\MarkdownBuilder: ~
+
+  Siketyan\Loxcan\Reporter\GitHub\GitHubUserPool:
+    shared: true
+
+  Siketyan\Loxcan\Reporter\GitHub\GitHubClient:
+    arguments:
+      $httpClient: '@guzzle.client.github'
+      $userPool: '@Siketyan\Loxcan\Reporter\GitHub\GitHubUserPool'
+
+  Siketyan\Loxcan\Reporter\GitHub\GitHubReporter:
+    arguments:
+      $markdownBuilder: '@Siketyan\Loxcan\Reporter\MarkdownBuilder'
+      $client: '@Siketyan\Loxcan\Reporter\GitHub\GitHubClient'
+    tags:
+      - 'loxcan.reporters'
+
+  Siketyan\Loxcan\Reporter\Console\ConsoleReporter:
+    arguments:
+      $markdownBuilder: '@Siketyan\Loxcan\Reporter\MarkdownBuilder'
+    tags:
+      - 'loxcan.reporters'
+
+  Siketyan\Loxcan\Reporter\ReporterResolver:
+    arguments:
+      $reporters: !tagged 'loxcan.reporters'
