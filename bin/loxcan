@@ -1,0 +1,56 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Siketyan\Loxcan\Command\ScanCommand;
+use Symfony\Component\Config\FileLocator;
+use Symfony\Component\Console\Application;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
+
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+} elseif (file_exists(__DIR__ . '/../../../autoload.php')) {
+    /** @noinspection PhpIncludeInspection */
+    require_once __DIR__ . '/../../../autoload.php';
+} else {
+    die('Failed to load the autoload.php.');
+}
+
+$configs = [
+    'commands.yaml',
+    'comparators.yaml',
+    'git.yaml',
+    'reporters.yaml',
+    'scanners.yaml',
+    'usecases.yaml',
+    'versioning.yaml',
+];
+
+$container = new ContainerBuilder();
+$loader = new YamlFileLoader($container, new FileLocator(__DIR__ . '/../config'));
+
+foreach ($configs as $config) {
+    try {
+        $loader->load($config);
+    } catch (Exception $e) {
+        die($e->getMessage());
+    }
+}
+
+$container->compile(true);
+
+try {
+    $application = new Application();
+    $application->add($container->get(ScanCommand::class));
+    $application->setDefaultCommand('scan', true);
+} catch (Exception $e) {
+    die($e->getMessage());
+}
+
+try {
+    $application->run();
+} catch (Exception $e) {
+    die('Failed to execute the application.');
+}
