@@ -9,6 +9,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 | Version | Tag | Upstream commit |
 |---------|-----|-----------------|
 | v0.11.0 | [`v0.11.0`](https://github.com/chainguard-actions/siketyan-loxcan/tree/v0.11.0) | [`4853564`](https://github.com/siketyan/loxcan/commit/4853564b175019314ed2c6679cf471a10b8198ad) |
+| v0.9.1 | [`v0.9.1`](https://github.com/chainguard-actions/siketyan-loxcan/tree/v0.9.1) | [`4711650`](https://github.com/siketyan/loxcan/commit/47116500f0016ff52149946875c96c03716367a2) |
 
 ## Privacy
 
