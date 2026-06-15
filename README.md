@@ -1,16 +1,73 @@
-# siketyan/loxcan
+# loxcan
+[![Latest Stable Version](https://poser.pugx.org/siketyan/loxcan/v)](https://packagist.org/packages/siketyan/loxcan)
+[![Total Downloads](https://poser.pugx.org/siketyan/loxcan/downloads)](https://packagist.org/packages/siketyan/loxcan)
+[![License](https://poser.pugx.org/siketyan/loxcan/license)](https://packagist.org/packages/siketyan/loxcan)
+[![Codecov](https://codecov.io/gh/siketyan/loxcan/branch/master/graph/badge.svg?token=2DB0MRBL4E)](https://codecov.io/gh/siketyan/loxcan)
+![PHP](https://github.com/siketyan/loxcan/workflows/PHP/badge.svg)
+![Action](https://github.com/siketyan/loxcan/workflows/Action/badge.svg)
 
 Universal Lock File Scanner for Git.
 
-Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at [https://github.com/siketyan/loxcan](https://github.com/siketyan/loxcan).
+## 🚀 Motivation
+Today, most languages have a package manager, and some language have two.
+Dependency management is very important and difficult in software development.
 
-## Versions
+In cases of code review, we check entire of the changed codes.
+However, we often ignore lock files in the review, which controls dependencies of the project or the library.
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| v0.10.0 | [`v0.10.0`](https://github.com/chainguard-actions/siketyan-loxcan/tree/v0.10.0) | — |
-| v0.11.0 | [`v0.11.0`](https://github.com/chainguard-actions/siketyan-loxcan/tree/v0.11.0) | [`4853564`](https://github.com/siketyan/loxcan/commit/4853564b175019314ed2c6679cf471a10b8198ad) |
-| v0.9.1 | [`v0.9.1`](https://github.com/chainguard-actions/siketyan-loxcan/tree/v0.9.1) | [`4711650`](https://github.com/siketyan/loxcan/commit/47116500f0016ff52149946875c96c03716367a2) |
+On GitHub Pull Request, most lock files are hidden by default.
+
+![Load diff screen](./resources/load-diff.png)
+
+Actually, they are very long and not human-readable.
+
+I tried to notify the diff of the lock files to the author of PR and/or the reviewer(s).
+Using this action, the added, upgraded, downgraded, and removed packages are reported to the PR, in user-friendly format.
+
+![Report of the changed packages](./resources/screenshot.png)
+
+So we can check what packages will be changed by the PR, in the review.
+
+## ✨ Usage
+### Via Composer
+```console
+$ composer require --dev siketyan/loxcan
+```
+
+Then you can use this tool in CLI.
+(In some IDEs, you can access to the executable as just `loxcan` !)
+
+```console
+$ ./vendor/bin/loxcan [base] [head]
+```
+
+### In GitHub Actions
+Use `pull_request` events to trigger the action.
+
+```yaml
+steps:
+  - uses: actions/checkout@v3
+    with:
+      fetch-depth: 0
+
+  - uses: siketyan/loxcan@main
+```
+
+## 📦 Supported Package Managers
+(✅ = Supported, ⬜️ = Scheduled)
+
+- [x] Composer (PHP)
+- [x] Cargo (Rust)
+- [x] Pub (Dart)
+- [x] npm (JavaScript, Node.js)
+- [x] pnpm (JavaScript, Node.js)
+- [x] Yarn (JavaScript, Node.js)
+
+## 📋 Supported Reporters
+(✅ = Supported, ⬜️ = Scheduled)
+
+- [x] GitHub
+- [ ] GitLab
 
 ## Privacy
 

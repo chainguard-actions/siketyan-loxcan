@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+
+if [ "${INPUT_REPORT_ENABLED}" = "true" ]; then
+  # shellcheck disable=SC2034
+  export LOXCAN_REPORTER_GITHUB="1"
+  export LOXCAN_REPORTER_GITHUB_OWNER="${INPUT_OWNER}"
+  export LOXCAN_REPORTER_GITHUB_REPO="${INPUT_REPO}"
+  export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${INPUT_ISSUE_NUMBER}"
+  export LOXCAN_REPORTER_GITHUB_TOKEN="${INPUT_TOKEN}"
+  export LOXCAN_REPORTER_GITHUB_USERNAME="github-actions[bot]"
+fi
+
+BRANCH_BASE="origin/${INPUT_BASE}"
+BRANCH_HEAD="${GITHUB_SHA}"
+
+/app/bin/loxcan "${BRANCH_BASE}" "${BRANCH_HEAD}"
