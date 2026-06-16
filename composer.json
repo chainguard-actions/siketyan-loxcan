@@ -1,0 +1,81 @@
+{
+    "name": "siketyan/loxcan",
+    "description": "Universal Lock File Scanner for Git.",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Naoki Ikeguchi",
+            "email": "me@s6n.jp"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": "^8.1",
+        "ext-json": "*",
+        "guzzlehttp/guzzle": "^7.7",
+        "jetbrains/phpstorm-attributes": "^1.0",
+        "mschop/pathogen": "^0.7.1",
+        "siketyan/yarn-lock": "^1.1",
+        "symfony/config": "^6.4|^7.0",
+        "symfony/console": "^6.4|^7.0",
+        "symfony/dependency-injection": "^6.4|^7.0",
+        "symfony/process": "^6.4|^7.0",
+        "symfony/yaml": "^6.4|^7.0",
+        "yosymfony/toml": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/php-code-coverage": "^10.1",
+        "phpunit/phpunit": "^10.5",
+        "psr/cache": "^3",
+        "psr/log": "^3",
+        "quartetcom/static-analysis-kit": "~8.1.19"
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/quartetcom/static-analysis-kit.git"
+        }
+    ],
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "quartetcom/static-analysis-kit": true
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Siketyan\\Loxcan\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Siketyan\\Loxcan\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/loxcan"
+    ],
+    "scripts": {
+        "analyse": "@php static-analysis-kit analyse --no-ecs",
+        "fix": "@php static-analysis-kit fix --no-ecs",
+        "fix:all": "@php static-analysis-kit fix --no-ecs --risky --rector",
+        "fix:rector": "@php static-analysis-kit fix --rector",
+        "fix:risky": "@php static-analysis-kit fix --no-ecs --risky",
+        "coverage": "XDEBUG_MODE=coverage phpunit -c ./phpunit.xml --coverage-html ./coverage",
+        "codecov": "XDEBUG_MODE=coverage phpunit -c ./phpunit.xml --coverage-clover ./coverage.xml",
+        "test": "@php phpunit -c ./phpunit.xml",
+        "tests": [
+            "@analyse",
+            "@test"
+        ]
+    },
+    "scripts-descriptions": {
+        "analyse": "Analyses code in this project fully.",
+        "fix": "Tries to fix code in this project automatically.",
+        "fix:all": "Tries to fix code in this project automatically fully.",
+        "fix:rector": "Tries to fix code in this project automatically with rector enabled.",
+        "fix:risky": "Tries to fix code in this project automatically with risky rules.",
+        "test": "Runs the tests."
+    }
+}
