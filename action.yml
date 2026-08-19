@@ -53,26 +53,26 @@ runs:
       env:
         ACTION_PATH: ${{ github.action_path }}
         REPORT_ENABLED: ${{ inputs.report_enabled }}
-        INPUT_OWNER: ${{ inputs.owner }}
-        INPUT_REPO: ${{ inputs.repo }}
-        INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
-        INPUT_TOKEN: ${{ inputs.token }}
-        INPUT_BASE: ${{ inputs.base }}
-        GIT_SHA: ${{ github.sha }}
+        OWNER: ${{ inputs.owner }}
+        REPO: ${{ inputs.repo }}
+        ISSUE_NUMBER: ${{ inputs.issue_number }}
+        TOKEN: ${{ inputs.token }}
+        BASE: ${{ inputs.base }}
+        GH_SHA: ${{ github.sha }}
       run: |
         pushd "$ACTION_PATH" && composer i -n && popd
 
         if [ "$REPORT_ENABLED" = "true" ]; then
           export LOXCAN_ARGS="-r github"
           export LOXCAN_REPORTER_GITHUB="1"
-          export LOXCAN_REPORTER_GITHUB_OWNER="$INPUT_OWNER"
-          export LOXCAN_REPORTER_GITHUB_REPO="$INPUT_REPO"
-          export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="$INPUT_ISSUE_NUMBER"
-          export LOXCAN_REPORTER_GITHUB_TOKEN="$INPUT_TOKEN"
+          export LOXCAN_REPORTER_GITHUB_OWNER="$OWNER"
+          export LOXCAN_REPORTER_GITHUB_REPO="$REPO"
+          export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="$ISSUE_NUMBER"
+          export LOXCAN_REPORTER_GITHUB_TOKEN="$TOKEN"
           export LOXCAN_REPORTER_GITHUB_USERNAME="github-actions[bot]"
         fi
 
-        BRANCH_BASE="origin/$INPUT_BASE"
-        BRANCH_HEAD="$GIT_SHA"
+        BRANCH_BASE="origin/$BASE"
+        BRANCH_HEAD="$GH_SHA"
 
-        "$ACTION_PATH/bin/loxcan" ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"
+        "$ACTION_PATH/bin/loxcan" ${LOXCAN_ARGS} "$BRANCH_BASE" "$BRANCH_HEAD"

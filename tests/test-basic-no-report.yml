@@ -1,0 +1,48 @@
+name: Test basic scan without reporting
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/act-harness
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP and Composer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php8.1-cli php8.1-json php8.1-mbstring php8.1-xml php8.1-curl \
+            php8.2-cli php8.2-mbstring php8.2-xml php8.2-curl || \
+          sudo apt-get install -y php-cli php-mbstring php-xml php-curl || true
+          # Install composer
+          curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          php --version
+          composer --version
+
+      - name: Ensure base branch ref exists
+        run: |
+          # Create a local ref that loxcan can use as origin/main
+          git fetch origin || true
+          # Make sure we have at least one ref available
+          git log --oneline -3
+          # Create origin/main ref pointing to current HEAD if it doesn't exist
+          git update-ref refs/remotes/origin/main HEAD
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: "false"
+          owner: "test-owner"
+          repo: "test-repo"
+          base: "main"
+          issue_number: "1"
+          token: "fake-token"
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Loxcan scan completed without errors"
+          echo "PASS"

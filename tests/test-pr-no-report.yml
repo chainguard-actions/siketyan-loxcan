@@ -1,0 +1,45 @@
+name: Test PR scan without reporting
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: pull_request
+      GITHUB_REF: refs/pull/1/merge
+      GITHUB_HEAD_REF: feature-branch
+      GITHUB_BASE_REF: main
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP and Composer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php-cli php-mbstring php-xml php-curl || true
+          # Install composer
+          curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          php --version
+          composer --version
+
+      - name: Ensure base branch ref exists
+        run: |
+          # Create origin/main ref pointing to current HEAD so loxcan can compare
+          git fetch origin || true
+          git update-ref refs/remotes/origin/main HEAD
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: "false"
+          owner: "test-owner"
+          repo: "test-repo"
+          base: "main"
+          issue_number: "42"
+          token: "fake-token"
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Loxcan PR scan completed without errors"
+          echo "PASS"

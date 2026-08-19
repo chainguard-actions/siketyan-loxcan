@@ -1,0 +1,53 @@
+name: Test Loxcan - No Report (basic scan, no changes)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up PHP 8.2
+        run: |
+          # Try to install php8.2 directly; if not available, add ondrej/php PPA
+          if ! apt-cache show php8.2 &>/dev/null; then
+            sudo add-apt-repository -y ppa:ondrej/php
+            sudo apt-get update -qq
+          fi
+          sudo apt-get install -y -qq php8.2 php8.2-cli php8.2-xml php8.2-curl php8.2-mbstring php8.2-zip
+          # Make php8.2 the default php
+          sudo update-alternatives --set php /usr/bin/php8.2 2>/dev/null || true
+          php --version
+
+      - name: Install Composer
+        run: |
+          if ! command -v composer &>/dev/null; then
+            curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          fi
+          composer --version
+
+      - name: Create origin/act-harness remote tracking ref
+        run: |
+          # Create a fake remote tracking ref pointing to HEAD so that
+          # "origin/act-harness" resolves to the same commit as HEAD,
+          # resulting in an empty diff (no lock file changes).
+          git update-ref refs/remotes/origin/act-harness HEAD
+          echo "Created refs/remotes/origin/act-harness -> $(git rev-parse HEAD)"
+
+      - name: Run loxcan scan with reporting disabled
+        id: action
+        uses: .
+        with:
+          report_enabled: "false"
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          base: act-harness
+          issue_number: "1"
+          token: ${{ github.token }}
+
+      - name: Assert scan completed successfully
+        run: |
+          echo "Loxcan scan completed without error"
+          echo "PASS"

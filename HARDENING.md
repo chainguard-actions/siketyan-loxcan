@@ -8,7 +8,7 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
 Action **siketyan--loxcan/v0.10.0** was hardened automatically. 7 finding(s) were identified and resolved across 1 iteration(s).
 
@@ -16,30 +16,51 @@ Action **siketyan--loxcan/v0.10.0** was hardened automatically. 7 finding(s) wer
 
 ### script-injection (severity: high)
 
-The single `run:` step in action.yml directly interpolates multiple `${{ }}` expressions into shell commands before the shell parses them, enabling script injection (sub-rule a). Offending lines include:
-- Line 36: `pushd '${{ github.action_path }}' && composer i -n && popd`
-- Line 38: `if [ "${{ inputs.report_enabled }}" = "true" ]; then`
-- Line 42: `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"`
-- Line 43: `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"`
-- Line 44: `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"`
-- Line 45: `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"`
-- Line 49: `BRANCH_BASE="origin/${{ inputs.base }}"`
-- Line 50: `BRANCH_HEAD="${{ github.sha }}"`
-- Line 52: `${{ github.action_path }}/bin/loxcan ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"`
+The single `run:` step in action.yml directly interpolates multiple `${{ }}` expressions inside the shell script (rule a). Before the shell ever parses the command, GitHub Actions substitutes these values as raw text, allowing an attacker who controls the calling workflow's inputs or event payload to inject arbitrary shell commands.
 
-Attacker-controlled inputs (`inputs.owner`, `inputs.repo`, `inputs.issue_number`, `inputs.token`, `inputs.base`, `inputs.report_enabled`) and GitHub context values (`github.action_path`, `github.sha`) are all substituted directly into the shell script by the Actions runner before the shell executes it. A malicious value such as `inputs.base` set to `main"; malicious_command; echo "` would execute arbitrary commands. All `${{ }}` expressions must be moved to `env:` variables and referenced as quoted shell variables instead.
+Offending lines:
+- Line 35: `pushd '${{ github.action_path }}' && composer i -n && popd`
+- Line 37: `if [ "${{ inputs.report_enabled }}" = "true" ]; then`
+- Line 40: `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"`
+- Line 41: `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"`
+- Line 42: `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"`
+- Line 43: `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"`
+- Line 46: `BRANCH_BASE="origin/${{ inputs.base }}"`
+- Line 47: `BRANCH_HEAD="${{ github.sha }}"`
+- Line 49: `${{ github.action_path }}/bin/loxcan ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"`
+
+Fix: Move all `${{ inputs.* }}` and `${{ github.* }}` values into `env:` variables on the step, then reference them as `"$ENV_VAR"` (double-quoted) inside the shell script. For example:
+```yaml
+env:
+  ACTION_PATH: ${{ github.action_path }}
+  REPORT_ENABLED: ${{ inputs.report_enabled }}
+  OWNER: ${{ inputs.owner }}
+  REPO: ${{ inputs.repo }}
+  ISSUE_NUMBER: ${{ inputs.issue_number }}
+  TOKEN: ${{ inputs.token }}
+  BASE: ${{ inputs.base }}
+  GH_SHA: ${{ github.sha }}
+run: |
+  pushd "$ACTION_PATH" && composer i -n && popd
+  if [ "$REPORT_ENABLED" = "true" ]; then
+    ...
+  fi
+  BRANCH_BASE="origin/$BASE"
+  BRANCH_HEAD="$GH_SHA"
+  "$ACTION_PATH"/bin/loxcan ${LOXCAN_ARGS} "$BRANCH_BASE" "$BRANCH_HEAD"
+```
 
 Locations:
 
-- `action.yml:36`
-- `action.yml:38`
+- `action.yml:35`
+- `action.yml:37`
+- `action.yml:40`
+- `action.yml:41`
 - `action.yml:42`
 - `action.yml:43`
-- `action.yml:44`
-- `action.yml:45`
+- `action.yml:46`
+- `action.yml:47`
 - `action.yml:49`
-- `action.yml:50`
-- `action.yml:52`
 
 ### static-inline-injection (severity: high)
 
@@ -97,5 +118,5 @@ Locations:
 
 **Notes:**
 
-Moved all ${{ }} expressions (github.action_path, inputs.report_enabled, inputs.owner, inputs.repo, inputs.issue_number, inputs.token, inputs.base, github.sha) from the run: shell script into an env: block on the step. Each expression is now assigned to a named environment variable (ACTION_PATH, REPORT_ENABLED, INPUT_OWNER, INPUT_REPO, INPUT_ISSUE_NUMBER, INPUT_TOKEN, INPUT_BASE, GIT_SHA) and referenced as a quoted shell variable in the run: block, preventing script injection attacks.
+Moved all ${{ }} expressions (github.action_path, inputs.report_enabled, inputs.owner, inputs.repo, inputs.issue_number, inputs.token, inputs.base, github.sha) out of the run: shell script and into an env: block on the step. The shell script now references only plain environment variables (ACTION_PATH, REPORT_ENABLED, OWNER, REPO, ISSUE_NUMBER, TOKEN, BASE, GH_SHA) with proper double-quoting, eliminating all shell injection vectors.
 
