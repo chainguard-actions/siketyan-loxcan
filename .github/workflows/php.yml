@@ -1,0 +1,64 @@
+name: PHP
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        php:
+          - '8.1'
+          - '8.2'
+          - '8.3'
+          - '8.4'
+          - '8.5'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php-${{ matrix.php }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-${{ matrix.php }}-
+
+      - name: Install dependencies
+        if: steps.composer-cache.outputs.cache-hit != 'true'
+        run: composer install --prefer-dist --no-progress
+
+      # Skip linter on PHP 8.4+:
+      # PHPStan's better-reflection has type compatibility issues with
+      # ReflectionProperty::IS_READONLY constant type change in PHP 8.4+.
+      # See: https://github.com/phpstan/phpstan/issues/10182
+      - name: Run linter
+        if: matrix.php != '8.4' && matrix.php != '8.5'
+        run: composer run-script analyse
+
+      - name: Run test suite
+        run: composer run-script codecov
+
+      - uses: codecov/codecov-action@v5
+        if: ${{ matrix.php }} == '8.5'
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.xml
+          verbose: true

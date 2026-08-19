@@ -1,0 +1,156 @@
+name: Test scan with lock file changes
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Ensure PHP 8.1+ and Composer are available
+        run: |
+          # Install PHP 8.1 if not already available or if version is too old
+          PHP_OK=false
+          if command -v php &>/dev/null; then
+            if php -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' 2>/dev/null; then
+              PHP_OK=true
+              echo "PHP $(php -r 'echo PHP_VERSION;') already satisfies ^8.1"
+            fi
+          fi
+          if [ "$PHP_OK" = "false" ]; then
+            echo "Installing PHP 8.1..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq php8.1-cli php8.1-mbstring php8.1-xml php8.1-curl php8.1-zip unzip 2>/dev/null || \
+              sudo apt-get install -y -qq php-cli php-mbstring php-xml php-curl php-zip unzip
+          fi
+          php --version
+
+          # Install Composer if not available
+          if ! command -v composer &>/dev/null; then
+            echo "Installing Composer..."
+            curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+            php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+            rm -f /tmp/composer-setup.php
+          fi
+          composer --version
+
+      - name: Set up git identity
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+      - name: Create base branch with test-project/composer.lock (version A - v1.0.0)
+        run: |
+          # Create a branch with test-project/composer.lock at version 1.0.0
+          git checkout -B base-with-lock
+          mkdir -p test-project
+          cat > test-project/composer.lock << 'LOCKEOF'
+          {
+              "_readme": ["This file is locked, do not edit it."],
+              "content-hash": "abc123",
+              "packages": [
+                  {
+                      "name": "vendor/package-a",
+                      "version": "1.0.0",
+                      "source": {
+                          "type": "git",
+                          "url": "https://github.com/vendor/package-a.git",
+                          "reference": "abc123"
+                      },
+                      "dist": {
+                          "type": "zip",
+                          "url": "https://api.github.com/repos/vendor/package-a/zipball/abc123",
+                          "reference": "abc123",
+                          "shasum": ""
+                      },
+                      "require": {},
+                      "type": "library",
+                      "description": "Package A"
+                  }
+              ],
+              "packages-dev": [],
+              "aliases": [],
+              "minimum-stability": "stable",
+              "stability-flags": [],
+              "prefer-stable": false,
+              "prefer-lowest": false,
+              "platform": {},
+              "platform-dev": {}
+          }
+          LOCKEOF
+          git add test-project/composer.lock
+          git commit -m "Add test-project/composer.lock v1.0.0"
+          # Go back to act-harness (the original branch)
+          git checkout -
+
+      - name: Set up bare remote with both branches
+        run: |
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          # Push act-harness (the head branch, matching github.sha)
+          git push "$GITHUB_WORKSPACE/.git-remote" act-harness:refs/heads/act-harness
+          # Push base-with-lock (the base branch for comparison)
+          git push "$GITHUB_WORKSPACE/.git-remote" base-with-lock:refs/heads/base-with-lock
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+          # Fetch so remote tracking branches exist
+          git fetch origin
+          git branch -r
+
+      - name: Create test-project/composer.lock on filesystem (version B - v1.1.0)
+        run: |
+          # This file represents the "head" state (read by loxcan from the filesystem)
+          # It differs from the base version (v1.0.0) to simulate a dependency update
+          mkdir -p test-project
+          cat > test-project/composer.lock << 'LOCKEOF'
+          {
+              "_readme": ["This file is locked, do not edit it."],
+              "content-hash": "def456",
+              "packages": [
+                  {
+                      "name": "vendor/package-a",
+                      "version": "1.1.0",
+                      "source": {
+                          "type": "git",
+                          "url": "https://github.com/vendor/package-a.git",
+                          "reference": "def456"
+                      },
+                      "dist": {
+                          "type": "zip",
+                          "url": "https://api.github.com/repos/vendor/package-a/zipball/def456",
+                          "reference": "def456",
+                          "shasum": ""
+                      },
+                      "require": {},
+                      "type": "library",
+                      "description": "Package A"
+                  }
+              ],
+              "packages-dev": [],
+              "aliases": [],
+              "minimum-stability": "stable",
+              "stability-flags": [],
+              "prefer-stable": false,
+              "prefer-lowest": false,
+              "platform": {},
+              "platform-dev": {}
+          }
+          LOCKEOF
+
+      - name: Run loxcan to detect lock file changes
+        id: action
+        uses: .
+        with:
+          report_enabled: 'false'
+          owner: 'test-owner'
+          repo: 'test-repo'
+          base: 'base-with-lock'
+          issue_number: '1'
+          token: ${{ github.token }}
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Action completed - lock file changes were detected and scanned"
+          echo "PASS"

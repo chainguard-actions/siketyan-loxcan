@@ -1,0 +1,68 @@
+name: Test basic scan (no lock file changes)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Ensure PHP 8.1+ and Composer are available
+        run: |
+          # Install PHP 8.1 if not already available or if version is too old
+          PHP_OK=false
+          if command -v php &>/dev/null; then
+            PHP_VER=$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')
+            if php -r 'exit(version_compare(PHP_VERSION, "8.1.0", ">=") ? 0 : 1);' 2>/dev/null; then
+              PHP_OK=true
+              echo "PHP $PHP_VER already satisfies ^8.1"
+            fi
+          fi
+          if [ "$PHP_OK" = "false" ]; then
+            echo "Installing PHP 8.1..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq php8.1-cli php8.1-mbstring php8.1-xml php8.1-curl php8.1-zip unzip 2>/dev/null || \
+              sudo apt-get install -y -qq php-cli php-mbstring php-xml php-curl php-zip unzip
+          fi
+          php --version
+
+          # Install Composer if not available
+          if ! command -v composer &>/dev/null; then
+            echo "Installing Composer..."
+            curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php
+            php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer --quiet
+            rm -f /tmp/composer-setup.php
+          fi
+          composer --version
+
+      - name: Set up git identity and reachable origin remote
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          # Create a bare repo inside GITHUB_WORKSPACE so it's reachable
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+          # Fetch so origin/act-harness tracking branch exists
+          git fetch origin
+          git branch -r
+
+      - name: Run loxcan (report disabled, base=act-harness, no lock file changes)
+        id: action
+        uses: .
+        with:
+          report_enabled: 'false'
+          owner: 'test-owner'
+          repo: 'test-repo'
+          base: 'act-harness'
+          issue_number: '1'
+          token: ${{ github.token }}
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Action completed without error - no lock file changes detected"
+          echo "PASS"
