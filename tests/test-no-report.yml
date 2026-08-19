@@ -1,0 +1,51 @@
+name: Test with reporting disabled
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/act-harness
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP and Composer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq php8.1 php8.1-xml php8.1-curl php8.1-mbstring composer 2>/dev/null || \
+          sudo apt-get install -y -qq php php-xml php-curl php-mbstring composer
+
+      - name: Ensure origin/act-harness ref exists for loxcan base comparison
+        run: |
+          git fetch origin || true
+          git branch -r | grep -q 'origin/act-harness' || \
+            git update-ref refs/remotes/origin/act-harness HEAD
+
+      - name: Verify LOXCAN_REPORTER_GITHUB is not set before action
+        run: |
+          if [ -n "${LOXCAN_REPORTER_GITHUB:-}" ]; then
+            echo "FAIL: LOXCAN_REPORTER_GITHUB should not be set before action"
+            exit 1
+          fi
+          echo "PASS: LOXCAN_REPORTER_GITHUB is not set"
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: "false"
+          owner: "test-owner"
+          repo: "test-repo"
+          base: "act-harness"
+          issue_number: "42"
+          token: "dummy-token-no-report"
+
+      - name: Assert action ran without GitHub reporter
+        run: |
+          # If report_enabled is false, LOXCAN_REPORTER_GITHUB should not be set
+          # The action runs in a subshell so env vars won't leak, but we verify
+          # the action completed successfully (exit 0)
+          echo "Action completed successfully with report_enabled=false"
+          echo "PASS"

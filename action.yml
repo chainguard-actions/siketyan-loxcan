@@ -52,7 +52,7 @@ runs:
     - shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
-        REPORT_ENABLED: ${{ inputs.report_enabled }}
+        INPUT_REPORT_ENABLED: ${{ inputs.report_enabled }}
         INPUT_OWNER: ${{ inputs.owner }}
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
@@ -62,7 +62,7 @@ runs:
       run: |
         pushd "$ACTION_PATH" && composer i -n && popd
 
-        if [ "$REPORT_ENABLED" = "true" ]; then
+        if [ "$INPUT_REPORT_ENABLED" = "true" ]; then
           export LOXCAN_REPORTER_GITHUB="1"
           export LOXCAN_REPORTER_GITHUB_OWNER="$INPUT_OWNER"
           export LOXCAN_REPORTER_GITHUB_REPO="$INPUT_REPO"

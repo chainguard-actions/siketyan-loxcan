@@ -1,0 +1,44 @@
+name: Test basic usage (no reporting)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP and Composer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq php8.1 php8.1-xml php8.1-curl php8.1-mbstring composer 2>/dev/null || \
+          sudo apt-get install -y -qq php php-xml php-curl php-mbstring composer
+
+      - name: Ensure origin remote and base branch exist
+        run: |
+          # Make sure origin/act-harness exists as a remote ref for loxcan to compare against
+          git fetch origin || true
+          # If act-harness doesn't exist on remote, create a local ref that mimics it
+          git branch -r | grep -q 'origin/act-harness' || \
+            git update-ref refs/remotes/origin/act-harness HEAD
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: "false"
+          owner: "siketyan"
+          repo: "loxcan"
+          base: "act-harness"
+          issue_number: "1"
+          token: "dummy-token"
+        env:
+          GITHUB_EVENT_NAME: pull_request
+          GITHUB_REF: refs/pull/1/merge
+          GITHUB_HEAD_REF: act-harness
+          GITHUB_BASE_REF: act-harness
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Action completed without error"
+          echo "PASS"

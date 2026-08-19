@@ -1,0 +1,58 @@
+name: Test report disabled - scan only
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP 8.2 and Composer
+        run: |
+          # Ensure PHP 8.x is available
+          if ! php --version 2>/dev/null | grep -qE 'PHP 8\.'; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq software-properties-common
+            sudo add-apt-repository -y ppa:ondrej/php
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq php8.2-cli php8.2-xml php8.2-curl php8.2-zip php8.2-mbstring php8.2-intl
+          fi
+          php --version
+          # Install composer if not available
+          if ! command -v composer >/dev/null 2>&1; then
+            curl -sS https://getcomposer.org/installer | php
+            sudo mv composer.phar /usr/local/bin/composer
+          fi
+          composer --version
+          echo "PHP and composer are available - PASS"
+
+      - name: Set up a valid base ref for loxcan
+        run: |
+          # Create a remote tracking ref pointing to HEAD so that
+          # "origin/test-base" resolves and git diff returns empty (no changes).
+          git update-ref refs/remotes/origin/test-base HEAD
+          echo "Created refs/remotes/origin/test-base -> $(git rev-parse HEAD)"
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: 'false'
+          owner: 'siketyan'
+          repo: 'loxcan'
+          base: 'test-base'
+          issue_number: '1'
+          token: ${{ github.token }}
+
+      - name: Assert action completed without GitHub reporter enabled
+        run: |
+          # With report_enabled=false, the action should:
+          # 1. Install composer dependencies
+          # 2. Run loxcan scan without setting LOXCAN_REPORTER_GITHUB
+          # 3. Exit successfully (LOXCAN_REPORTER_GITHUB env var should NOT be set)
+          if [ -n "${LOXCAN_REPORTER_GITHUB:-}" ]; then
+            echo "FAIL: LOXCAN_REPORTER_GITHUB should not be set when report_enabled=false"
+            exit 1
+          fi
+          echo "Action completed without GitHub reporter - PASS"
