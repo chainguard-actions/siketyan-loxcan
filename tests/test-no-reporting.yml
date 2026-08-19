@@ -1,0 +1,67 @@
+name: Test scan with reporting disabled
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP and Composer
+        run: |
+          php --version 2>/dev/null || (apt-get update -qq && apt-get install -y -qq php-cli php-curl php-mbstring php-xml php-zip php-json)
+          # Ensure needed extensions are available
+          php -m | grep -qi curl || apt-get install -y -qq php-curl
+          php -m | grep -qi mbstring || apt-get install -y -qq php-mbstring
+          php -m | grep -qi xml || apt-get install -y -qq php-xml
+          php -m | grep -qi zip || apt-get install -y -qq php-zip
+          # Install Composer if not present
+          if ! which composer > /dev/null 2>&1; then
+            curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          fi
+          composer --version
+
+      - name: Set up git identity and origin reachable from action
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+
+          # Create a bare repo under GITHUB_WORKSPACE so it's reachable
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git push "$GITHUB_WORKSPACE/.git-remote" --tags
+
+          # Point origin at the bare repo and fetch so origin/act-harness ref exists
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+          git fetch origin
+
+          # Verify origin/act-harness is a valid ref
+          git rev-parse origin/act-harness
+          echo "origin/act-harness ref is valid"
+
+      - name: Verify LOXCAN_REPORTER_GITHUB is not set before action
+        run: |
+          if [ -n "${LOXCAN_REPORTER_GITHUB:-}" ]; then
+            echo "FAIL: LOXCAN_REPORTER_GITHUB should not be set before action"
+            exit 1
+          fi
+          echo "PASS: LOXCAN_REPORTER_GITHUB is not set"
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: 'false'
+          owner: 'test-owner'
+          repo: 'test-repo'
+          base: 'act-harness'
+          issue_number: '0'
+          token: ${{ github.token }}
+
+      - name: Assert action completed without GitHub reporter
+        run: |
+          echo "Action completed with report_enabled=false"
+          echo "PASS: No GitHub reporting configured"

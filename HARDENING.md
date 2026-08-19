@@ -8,38 +8,35 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **siketyan--loxcan/v0.10.1** was hardened automatically. 7 finding(s) were identified and resolved across 1 iteration(s).
+Action **siketyan--loxcan/v0.10.1** was hardened automatically. 8 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
 ### script-injection (severity: high)
 
-The composite action's `run:` block in action.yml directly interpolates multiple `${{ }}` expressions into shell commands (rule a). This allows an attacker to inject arbitrary shell commands by controlling the input values or via crafted GitHub event data. Affected lines:
-- Line 36: `pushd '${{ github.action_path }}'` — github context interpolated directly into shell
-- Line 38: `if [ "${{ inputs.report_enabled }}" = "true" ]` — attacker-controlled input interpolated directly
-- Line 42: `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"` — attacker-controlled input
-- Line 43: `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"` — attacker-controlled input
-- Line 44: `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"` — attacker-controlled input
-- Line 45: `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"` — attacker-controlled input
-- Line 49: `BRANCH_BASE="origin/${{ inputs.base }}"` — attacker-controlled input
-- Line 50: `BRANCH_HEAD="${{ github.sha }}"` — github context interpolated directly
-- Line 52: `${{ github.action_path }}/bin/loxcan ...` — github context used as command prefix
-
-All these values should be passed via `env:` variables and then referenced as properly double-quoted shell variables (e.g., `"$INPUT_BASE"`) instead of being interpolated directly as `${{ }}` expressions.
+The composite action's run: block in action.yml directly interpolates multiple ${{ }} expressions into shell commands (sub-rule a). This allows an attacker who controls input values to inject arbitrary shell commands. Affected interpolations include: `pushd '${{ github.action_path }}'`, `if [ "${{ inputs.report_enabled }}" = "true" ]`, `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"`, `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"`, `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"`, `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"`, `BRANCH_BASE="origin/${{ inputs.base }}"`, `BRANCH_HEAD="${{ github.sha }}"`, and `${{ github.action_path }}/bin/loxcan ...`. All ${{ }} expressions should be moved to env: vars and the env vars used in the run: block instead.
 
 Locations:
 
-- `action.yml:36`
 - `action.yml:38`
-- `action.yml:42`
-- `action.yml:43`
-- `action.yml:44`
-- `action.yml:45`
-- `action.yml:49`
-- `action.yml:50`
-- `action.yml:52`
+
+### unpinned-uses (severity: high)
+
+All uses: references across the workflow files use mutable version tags instead of pinned 40-character SHA commit hashes, making the workflows vulnerable to supply-chain attacks if the referenced tags are moved or compromised. Unpinned references: actions/checkout@v4 (.github/workflows/action.yml), actions/checkout@v4 (.github/workflows/docker.yml), docker/setup-buildx-action@v3 (.github/workflows/docker.yml), docker/login-action@v3 (.github/workflows/docker.yml), docker/build-push-action@v5 (.github/workflows/docker.yml), actions/checkout@v4 (.github/workflows/php.yml), shivammathur/setup-php@v2 (.github/workflows/php.yml), actions/cache@v3 (.github/workflows/php.yml), codecov/codecov-action@v3 (.github/workflows/php.yml).
+
+Locations:
+
+- `.github/workflows/action.yml:16`
+- `.github/workflows/docker.yml:14`
+- `.github/workflows/docker.yml:18`
+- `.github/workflows/docker.yml:23`
+- `.github/workflows/docker.yml:35`
+- `.github/workflows/php.yml:18`
+- `.github/workflows/php.yml:22`
+- `.github/workflows/php.yml:31`
+- `.github/workflows/php.yml:52`
 
 ### static-inline-injection (severity: high)
 
@@ -93,9 +90,9 @@ Locations:
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, static-inline-injection
+**Fixes applied:** script-injection, static-inline-injection, unpinned-uses
 
 **Notes:**
 
-Fixed all script injection findings in action.yml by moving all ${{ }} expressions (github.action_path, github.sha, inputs.report_enabled, inputs.owner, inputs.repo, inputs.issue_number, inputs.token, inputs.base) from the run: block into a step-level env: map. The shell script now references these values as plain environment variables (e.g., $ACTION_PATH, $INPUT_REPORT_ENABLED, $INPUT_OWNER, etc.) instead of directly interpolating ${{ }} expressions. The binary invocation was also changed from `${{ github.action_path }}/bin/loxcan` to `"$ACTION_PATH/bin/loxcan"` (properly quoted) to prevent both injection and word-splitting issues.
+Fixed script injection in action.yml by moving all ${{ }} expressions (github.action_path, inputs.report_enabled, inputs.owner, inputs.repo, inputs.issue_number, inputs.token, inputs.base, github.sha) into an env: block and referencing them as plain shell variables. Pinned all 9 unpinned action references across .github/workflows/action.yml, .github/workflows/docker.yml, and .github/workflows/php.yml to their full 40-character SHA commit hashes with version tag comments for readability.
 

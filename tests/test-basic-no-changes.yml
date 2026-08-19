@@ -1,0 +1,43 @@
+name: Test basic scan with no lock file changes
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install PHP and Composer
+        run: |
+          php --version || (apt-get update -qq && apt-get install -y -qq php-cli php-json php-mbstring php-xml php-curl php-zip)
+          composer --version || (curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer)
+
+      - name: Set up git remote ref so origin/act-harness exists
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test"
+          # Create a remote tracking ref pointing to current HEAD (no diff = no changes)
+          HEAD_SHA=$(git rev-parse HEAD)
+          echo "HEAD SHA: $HEAD_SHA"
+          git update-ref refs/remotes/origin/act-harness "$HEAD_SHA"
+          echo "Created refs/remotes/origin/act-harness -> $HEAD_SHA"
+          git branch -r
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: 'false'
+          owner: 'test-owner'
+          repo: 'test-repo'
+          base: 'act-harness'
+          issue_number: '1'
+          token: 'fake-token'
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+
+      - name: Assert action completed successfully
+        run: |
+          echo "Action completed without error - no lock file changes detected"
+          echo "PASS"
