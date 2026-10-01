@@ -62,8 +62,9 @@ runs:
       run: |
         pushd "$ACTION_PATH" && composer i -n && popd
 
+        loxcan_args=()
         if [ "$INPUT_REPORT_ENABLED" = "true" ]; then
-          export LOXCAN_ARGS="-r github"
+          loxcan_args+=("-r" "github")
           export LOXCAN_REPORTER_GITHUB="1"
           export LOXCAN_REPORTER_GITHUB_OWNER="$INPUT_OWNER"
           export LOXCAN_REPORTER_GITHUB_REPO="$INPUT_REPO"
@@ -75,4 +76,4 @@ runs:
         BRANCH_BASE="origin/$INPUT_BASE"
         BRANCH_HEAD="$GITHUB_SHA_VALUE"
 
-        "$ACTION_PATH/bin/loxcan" ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"
+        "$ACTION_PATH/bin/loxcan" "${loxcan_args[@]}" "$BRANCH_BASE" "$BRANCH_HEAD"

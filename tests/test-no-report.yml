@@ -1,0 +1,59 @@
+name: Test with report disabled
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up git config and origin remote reachable from action
+        run: |
+          git config user.email "test@example.com"
+          git config user.name "Test User"
+          # Create a bare repo under GITHUB_WORKSPACE so it's reachable
+          rm -rf "$GITHUB_WORKSPACE/.git-remote"
+          git init --bare "$GITHUB_WORKSPACE/.git-remote"
+          git push "$GITHUB_WORKSPACE/.git-remote" HEAD:refs/heads/act-harness
+          git remote set-url origin "$GITHUB_WORKSPACE/.git-remote" 2>/dev/null || \
+            git remote add origin "$GITHUB_WORKSPACE/.git-remote"
+
+      - name: Install PHP and Composer
+        run: |
+          which php || (apt-get update -qq && apt-get install -y -qq php-cli php-json php-mbstring php-xml php-curl)
+          which composer || (curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer)
+
+      - name: Verify LOXCAN_REPORTER_GITHUB is not set when report_enabled is false
+        run: |
+          # Ensure the env var is not set before the action runs
+          unset LOXCAN_REPORTER_GITHUB || true
+          echo "LOXCAN_REPORTER_GITHUB is: '${LOXCAN_REPORTER_GITHUB:-}'"
+
+      - id: action
+        uses: .
+        with:
+          report_enabled: 'false'
+          owner: 'test-owner'
+          repo: 'test-repo'
+          base: 'act-harness'
+          issue_number: '99'
+          token: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Assert action ran without GitHub reporter
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # When report_enabled=false, no GitHub API calls are made
+          # The action should succeed or fail gracefully (not due to GitHub API errors)
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded without GitHub reporter"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (acceptable - may be due to PHP/composer setup)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

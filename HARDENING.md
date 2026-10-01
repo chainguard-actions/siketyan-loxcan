@@ -8,7 +8,7 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
 Action **siketyan--loxcan/v0.9.1** was hardened automatically. 7 finding(s) were identified and resolved across 1 iteration(s).
 
@@ -16,32 +16,23 @@ Action **siketyan--loxcan/v0.9.1** was hardened automatically. 7 finding(s) were
 
 ### script-injection (severity: high)
 
-The single `run:` block in action.yml directly interpolates multiple GitHub Actions expressions into shell commands (rule a). Before the shell executes the script, YAML template substitution replaces these expressions with their raw values, allowing an attacker-controlled input to inject arbitrary shell commands.
+The `run:` block in action.yml directly interpolates multiple `${{ }}` expressions into shell commands (sub-rule a), allowing script injection. Attacker-controllable inputs are embedded verbatim into the shell script before the shell ever sees them:
 
-Offending lines:
-- Line 35: `pushd '${{ github.action_path }}' && composer i -n && popd` — `github.action_path` interpolated directly
-- Line 37: `if [ "${{ inputs.report_enabled }}" = "true" ]; then` — `inputs.report_enabled` interpolated directly
-- Line 41: `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"` — `inputs.owner` interpolated directly
-- Line 42: `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"` — `inputs.repo` interpolated directly
-- Line 43: `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"` — `inputs.issue_number` interpolated directly
-- Line 44: `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"` — `inputs.token` interpolated directly
-- Line 47: `BRANCH_BASE="origin/${{ inputs.base }}"` — `inputs.base` interpolated directly
-- Line 48: `BRANCH_HEAD="${{ github.sha }}"` — `github.sha` interpolated directly
-- Line 50: `${{ github.action_path }}/bin/loxcan ...` — `github.action_path` used as command prefix
+- Line 35: `pushd '${{ github.action_path }}'` — github context interpolated directly
+- Line 37: `if [ "${{ inputs.report_enabled }}" = "true" ]` — inputs interpolated directly
+- Line 41: `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"` — inputs interpolated directly
+- Line 42: `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"` — inputs interpolated directly
+- Line 43: `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"` — inputs interpolated directly
+- Line 44: `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"` — inputs interpolated directly
+- Line 48: `BRANCH_BASE="origin/${{ inputs.base }}"` — attacker-controlled branch name interpolated directly into shell
+- Line 49: `BRANCH_HEAD="${{ github.sha }}"` — github context interpolated directly
+- Line 51: `${{ github.action_path }}/bin/loxcan` — github context used as command path
 
-All `inputs.*` values are caller-controlled and must be passed via `env:` variables and then referenced as `"$VAR"` in the shell, never via `${{ ... }}` inside a `run:` block.
+Additionally (sub-rule b), line 51 uses `${LOXCAN_ARGS}` unquoted, which allows shell metacharacter splitting. All `${{ inputs.* }}` and `${{ github.* }}` values should be passed via `env:` variables and referenced as quoted shell variables (e.g., `"$INPUT_OWNER"`) instead of being interpolated directly.
 
 Locations:
 
-- `action.yml:35`
-- `action.yml:37`
-- `action.yml:41`
-- `action.yml:42`
-- `action.yml:43`
-- `action.yml:44`
-- `action.yml:47`
-- `action.yml:48`
-- `action.yml:50`
+- `action.yml:34`
 
 ### static-inline-injection (severity: high)
 
@@ -99,5 +90,5 @@ Locations:
 
 **Notes:**
 
-Fixed all script injection findings in action.yml by moving all ${{ }} expressions from the run: block into an env: block. Specifically: github.action_path → ACTION_PATH, inputs.report_enabled → INPUT_REPORT_ENABLED, inputs.owner → INPUT_OWNER, inputs.repo → INPUT_REPO, inputs.issue_number → INPUT_ISSUE_NUMBER, inputs.token → INPUT_TOKEN, inputs.base → INPUT_BASE, github.sha → GITHUB_SHA_VALUE. The shell script now references these as plain environment variables. The action_path used as a command prefix is now safely quoted as "$ACTION_PATH/bin/loxcan".
+Moved all ${{ }} expressions from the run: block into the step's env: block. Each expression is now referenced as a quoted shell variable ($VAR_NAME) in the script. The unquoted ${LOXCAN_ARGS} variable was replaced with a bash array (loxcan_args) expanded as "${loxcan_args[@]}" to keep argument boundaries intact. Affected expressions: github.action_path, inputs.report_enabled, inputs.owner, inputs.repo, inputs.issue_number, inputs.token, inputs.base, github.sha.
 
