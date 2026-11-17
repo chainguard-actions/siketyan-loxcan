@@ -4,7 +4,7 @@
 
 > This file was generated automatically by the hardening agent.
 
-**Policy SHA:** `d636be7e43ef829af6e853da6b3c7566db9f72fe`
+**Policy SHA:** `374911c4be584df24e6da57af2d990570ef0f859`
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
@@ -16,27 +16,19 @@ Action **siketyan--loxcan/v0.10.1** was hardened automatically. 8 finding(s) wer
 
 ### script-injection (severity: high)
 
-The composite action's run: block in action.yml directly interpolates multiple ${{ }} expressions into shell commands (sub-rule a). This allows an attacker who controls input values to inject arbitrary shell commands. Affected interpolations include: `pushd '${{ github.action_path }}'`, `if [ "${{ inputs.report_enabled }}" = "true" ]`, `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"`, `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"`, `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"`, `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"`, `BRANCH_BASE="origin/${{ inputs.base }}"`, `BRANCH_HEAD="${{ github.sha }}"`, and `${{ github.action_path }}/bin/loxcan ...`. All ${{ }} expressions should be moved to env: vars and the env vars used in the run: block instead.
+Rule (a): the composite action's run: block puts GitHub Actions expressions straight into the shell script, where they are substituted before the shell parses anything. Offending lines: `pushd '${{ github.action_path }}' && composer i -n && popd`; `if [ "${{ inputs.report_enabled }}" = "true" ]; then`; `export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"`; `export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"`; `export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"`; `export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"`; `BRANCH_BASE="origin/${{ inputs.base }}"` (the default for inputs.base is github.event.pull_request.base.ref, an attacker-influenced branch name); `BRANCH_HEAD="${{ github.sha }}"`; `${{ github.action_path }}/bin/loxcan ${LOXCAN_ARGS} ...`. Rule (b): `${LOXCAN_ARGS}` is expanded without quotes. When report_enabled is not 'true', the script never sets LOXCAN_ARGS, so its value is inherited from the calling workflow's environment. Fix: map each expression to an env: entry (for example INPUT_BASE, INPUT_OWNER, INPUT_REPO, INPUT_ISSUE_NUMBER, INPUT_TOKEN, INPUT_REPORT_ENABLED), then reference "$GITHUB_ACTION_PATH" and "$GITHUB_SHA" in double quotes. Build the loxcan arguments inside the script, e.g. as a bash array set only in the report branch, instead of relying on an inherited LOXCAN_ARGS.
 
 Locations:
 
+- `action.yml:36`
 - `action.yml:38`
-
-### unpinned-uses (severity: high)
-
-All uses: references across the workflow files use mutable version tags instead of pinned 40-character SHA commit hashes, making the workflows vulnerable to supply-chain attacks if the referenced tags are moved or compromised. Unpinned references: actions/checkout@v4 (.github/workflows/action.yml), actions/checkout@v4 (.github/workflows/docker.yml), docker/setup-buildx-action@v3 (.github/workflows/docker.yml), docker/login-action@v3 (.github/workflows/docker.yml), docker/build-push-action@v5 (.github/workflows/docker.yml), actions/checkout@v4 (.github/workflows/php.yml), shivammathur/setup-php@v2 (.github/workflows/php.yml), actions/cache@v3 (.github/workflows/php.yml), codecov/codecov-action@v3 (.github/workflows/php.yml).
-
-Locations:
-
-- `.github/workflows/action.yml:16`
-- `.github/workflows/docker.yml:14`
-- `.github/workflows/docker.yml:18`
-- `.github/workflows/docker.yml:23`
-- `.github/workflows/docker.yml:35`
-- `.github/workflows/php.yml:18`
-- `.github/workflows/php.yml:22`
-- `.github/workflows/php.yml:31`
-- `.github/workflows/php.yml:52`
+- `action.yml:41`
+- `action.yml:42`
+- `action.yml:43`
+- `action.yml:44`
+- `action.yml:48`
+- `action.yml:49`
+- `action.yml:51`
 
 ### static-inline-injection (severity: high)
 
@@ -86,13 +78,71 @@ Locations:
 
 - `action.yml:49`
 
+### prior-fix (severity: high)
+
+Carried forward from this version's previous harden, which fixed it; fix it again unless the code no longer has the problem. The previous harden changed action.yml without recording a finding for it, and this analysis reported nothing there. Re-apply its security changes unless the code no longer needs them. The previous patch:
+```diff
+diff --git a/action.yml b/action.yml
+index ebd1414..90254dc 100644
+--- a/action.yml
++++ b/action.yml
+@@ -32,21 +32,47 @@ inputs:
+ runs:
+   using: 'composite'
+   steps:
+     - shell: bash
++      env:
++        ACTION_PATH: ${{ github.action_path }}
++        INPUT_REPORT_ENABLED: ${{ inputs.report_enabled }}
++        INPUT_OWNER: ${{ inputs.owner }}
++        INPUT_REPO: ${{ inputs.repo }}
++        INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
++        INPUT_TOKEN: ${{ inputs.token }}
++        INPUT_BASE: ${{ inputs.base }}
++        GITHUB_SHA_VALUE: ${{ github.sha }}
+       run: |
+-        pushd '${{ github.action_path }}' && composer i -n && popd
+-        
+-        if [ "${{ inputs.report_enabled }}" = "true" ]; then
++        pushd "$ACTION_PATH" && composer i -n && popd
++
++        if [ "$INPUT_REPORT_ENABLED" = "true" ]; then
+           export LOXCAN_ARGS="-r github"
+           export LOXCAN_REPORTER_GITHUB="1"
+-          export LOXCAN_REPORTER_GITHUB_OWNER="${{ inputs.owner }}"
+-          export LOXCAN_REPORTER_GITHUB_REPO="${{ inputs.repo }}"
+-          export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="${{ inputs.issue_number }}"
+-          export LOXCAN_REPORTER_GITHUB_TOKEN="${{ inputs.token }}"
++          export LOXCAN_REPORTER_GITHUB_OWNER="$INPUT_OWNER"
++          export LOXCAN_REPORTER_GITHUB_REPO="$INPUT_REPO"
++          export LOXCAN_REPORTER_GITHUB_ISSUE_NUMBER="$INPUT_ISSUE_NUMBER"
++          export LOXCAN_REPORTER_GITHUB_TOKEN="$INPUT_TOKEN"
+           export LOXCAN_REPORTER_GITHUB_USERNAME="github-actions[bot]"
+         fi
+-        
+-        BRANCH_BASE="origin/${{ inputs.base }}"
+-        BRANCH_HEAD="${{ github.sha }}"
+-        
+-        ${{ github.action_path }}/bin/loxcan ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"
++
++        BRANCH_BASE="origin/$INPUT_BASE"
++        BRANCH_HEAD="$GITHUB_SHA_VALUE"
++
++        "$ACTION_PATH/bin/loxcan" ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"
+
+```
+
+Locations:
+
+- `action.yml`
+
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, static-inline-injection, unpinned-uses
+**Fixes applied:** script-injection, static-inline-injection, prior-fix
 
 **Notes:**
 
-Fixed script injection in action.yml by moving all ${{ }} expressions (github.action_path, inputs.report_enabled, inputs.owner, inputs.repo, inputs.issue_number, inputs.token, inputs.base, github.sha) into an env: block and referencing them as plain shell variables. Pinned all 9 unpinned action references across .github/workflows/action.yml, .github/workflows/docker.yml, and .github/workflows/php.yml to their full 40-character SHA commit hashes with version tag comments for readability.
+action.yml: moved every input expression (report_enabled, owner, repo, issue_number, token, base) into the step's env: block. The script now uses "$GITHUB_ACTION_PATH" and "$GITHUB_SHA" in double quotes. The unquoted ${LOXCAN_ARGS}, which picked up its value from the calling workflow's environment, is replaced by a bash array (loxcan_args) that starts empty and is set to (-r github) only when reporting is enabled. Behavior change: a value set in the caller's LOXCAN_ARGS environment variable is no longer passed to loxcan. Also re-applied the previous harden's env mapping.
 

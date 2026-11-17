@@ -51,19 +51,18 @@ runs:
           "https://actions.enforce.dev/actions/v1/record" >/dev/null 2>&1 || true
     - shell: bash
       env:
-        ACTION_PATH: ${{ github.action_path }}
         INPUT_REPORT_ENABLED: ${{ inputs.report_enabled }}
         INPUT_OWNER: ${{ inputs.owner }}
         INPUT_REPO: ${{ inputs.repo }}
         INPUT_ISSUE_NUMBER: ${{ inputs.issue_number }}
         INPUT_TOKEN: ${{ inputs.token }}
         INPUT_BASE: ${{ inputs.base }}
-        GITHUB_SHA_VALUE: ${{ github.sha }}
       run: |
-        pushd "$ACTION_PATH" && composer i -n && popd
+        pushd "$GITHUB_ACTION_PATH" && composer i -n && popd
 
+        loxcan_args=()
         if [ "$INPUT_REPORT_ENABLED" = "true" ]; then
-          export LOXCAN_ARGS="-r github"
+          loxcan_args=(-r github)
           export LOXCAN_REPORTER_GITHUB="1"
           export LOXCAN_REPORTER_GITHUB_OWNER="$INPUT_OWNER"
           export LOXCAN_REPORTER_GITHUB_REPO="$INPUT_REPO"
@@ -73,6 +72,6 @@ runs:
         fi
 
         BRANCH_BASE="origin/$INPUT_BASE"
-        BRANCH_HEAD="$GITHUB_SHA_VALUE"
+        BRANCH_HEAD="$GITHUB_SHA"
 
-        "$ACTION_PATH/bin/loxcan" ${LOXCAN_ARGS} "${BRANCH_BASE}" "${BRANCH_HEAD}"
+        "$GITHUB_ACTION_PATH/bin/loxcan" "${loxcan_args[@]}" "${BRANCH_BASE}" "${BRANCH_HEAD}"
